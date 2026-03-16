@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dual N-Back — Cognitive Experiment</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --border: #252a35;
+    --accent: #00e5c0;
+    --accent2: #ff6b35;
+    --text: #e8eaf0;
+    --muted: #5a6070;
+    --correct: #00c97a;
+    --wrong: #ff4757;
+    --grid-cell: #1c2030;
+    --grid-active: #00e5c0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  /* Subtle noise texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ---- HEADER ---- */
+  header {
+    width: 100%;
+    max-width: 860px;
+    padding: 28px 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  .logo-icon span {
+    border-radius: 3px;
+    background: var(--border);
+  }
+  .logo-icon span:nth-child(1) { background: var(--accent); }
+  .logo-icon span:nth-child(4) { background: var(--accent2); }
+
+  .logo-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .logo-text strong { color: var(--text); display: block; font-size: 15px; }
+
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 10px;
+    border-radius: 20px;
+    opacity: 0.8;
+  }
+
+  /* ---- MAIN ---- */
+  main {
+    width: 100%;
+    max-width: 860px;
+    padding: 32px 24px 48px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  /* ---- SCREENS ---- */
+  .screen { width: 100%; display: none; flex-direction: column; align-items: center; gap: 20px; }
+  .screen.active { display: flex; }
+
+  /* ---- INTRO SCREEN ---- */
+  .intro-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 48px;
+    max-width: 600px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .intro-card h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .intro-card h1 span { color: var(--accent); }
+
+  .intro-card .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .intro-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 32px;
+    text-align: left;
+  }
+
+  .info-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+
+  .info-box .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .info-box .value {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .info-box .value span { color: var(--accent); }
+
+  .participant-section {
+    margin-bottom: 28px;
+    text-align: left;
+  }
+
+  .participant-section label {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .participant-section input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .participant-section input:focus {
+    border-color: var(--accent);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0f14;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 40px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary:hover { background: #00ffda; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  /* ---- INSTRUCTIONS SCREEN ---- */
+  .instructions-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 48px;
+    max-width: 600px;
+    width: 100%;
+  }
+
+  .instructions-card h2 {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    margin-bottom: 20px;
+    color: var(--accent);
+  }
+
+  .instructions-card p {
+    color: #a0a8b8;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .key-guide {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 24px 0;
+  }
+
+  .key-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .key-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 12px;
+    white-space: nowrap;
+  }
+
+  .key-desc { font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+  /* ---- GAME SCREEN ---- */
+  .game-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 4px;
+  }
+
+  .trial-counter {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .trial-counter span { color: var(--text); font-size: 16px; }
+
+  .nback-indicator {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .nback-indicator span { color: var(--accent); font-size: 16px; font-weight: 700; }
+
+  .score-live {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .score-live span { color: var(--correct); display: block; font-size: 16px; }
+
+  /* ---- GRID ---- */
+  .grid-wrap {
+    position: relative;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    width: 360px;
+    height: 360px;
+  }
+
+  .cell {
+    background: var(--grid-cell);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    transition: background 0.08s, box-shadow 0.08s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(0,229,192,0.15) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .cell.active {
+    background: var(--accent);
+    box-shadow: 0 0 30px rgba(0,229,192,0.4), 0 0 60px rgba(0,229,192,0.15);
+    border-color: var(--accent);
+  }
+
+  .cell.active::after { opacity: 1; }
+
+  /* ---- AUDIO DISPLAY ---- */
+  .audio-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .audio-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .audio-letter {
+    font-family: 'Space Mono', monospace;
+    font-size: 64px;
+    font-weight: 700;
+    color: var(--accent2);
+    line-height: 1;
+    min-width: 60px;
+    text-align: center;
+    transition: all 0.1s;
+    text-shadow: 0 0 30px rgba(255,107,53,0.4);
+    opacity: 0;
+  }
+
+  .audio-letter.show { opacity: 1; }
+
+  /* ---- BUTTONS ---- */
+  .response-buttons {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .btn-response {
+    flex: 1;
+    padding: 16px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-response .btn-key {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .btn-response.pos-btn .btn-key { color: var(--accent); }
+  .btn-response.aud-btn .btn-key { color: var(--accent2); }
+
+  .btn-response:hover { border-color: var(--accent); background: rgba(0,229,192,0.05); }
+  .btn-response.aud-btn:hover { border-color: var(--accent2); background: rgba(255,107,53,0.05); }
+
+  .btn-response.pressed-correct {
+    border-color: var(--correct);
+    background: rgba(0,201,122,0.12);
+    animation: flash-correct 0.3s ease;
+  }
+
+  .btn-response.pressed-wrong {
+    border-color: var(--wrong);
+    background: rgba(255,71,87,0.12);
+    animation: flash-wrong 0.3s ease;
+  }
+
+  @keyframes flash-correct {
+    0% { transform: scale(0.97); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes flash-wrong {
+    0% { transform: scale(0.97); }
+    30% { transform: translateX(-3px); }
+    60% { transform: translateX(3px); }
+    100% { transform: scale(1); }
+  }
+
+  /* ---- FEEDBACK ---- */
+  .feedback-bar {
+    height: 3px;
+    width: 360px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .feedback-fill {
+    height: 100%;
+    width: 100%;
+    background: var(--accent);
+    transform-origin: left;
+    transform: scaleX(1);
+    transition: transform linear;
+  }
+
+  /* ---- RESULT SCREEN ---- */
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 48px;
+    max-width: 620px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .result-card h2 {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+
+  .result-card .participant-name {
+    color: var(--accent);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .score-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 12px;
+  }
+
+  .score-box .s-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .score-box .s-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .score-box .s-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+
+  .data-table th {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(37,42,53,0.5);
+    color: #a0a8b8;
+  }
+
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+  .tag.hit { background: rgba(0,201,122,0.15); color: var(--correct); }
+  .tag.miss { background: rgba(255,71,87,0.15); color: var(--wrong); }
+  .tag.fa { background: rgba(255,107,53,0.15); color: var(--accent2); }
+  .tag.cr { background: rgba(90,96,112,0.2); color: var(--muted); }
+  .tag.na { background: rgba(37,42,53,0.5); color: var(--muted); }
+
+  .export-section {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .btn-export {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 24px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-export:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-again {
+    background: var(--accent);
+    color: #0d0f14;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-again:hover { background: #00ffda; }
+
+  /* ---- WAIT OVERLAY ---- */
+  .wait-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(13,15,20,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+
+  .wait-overlay.active { display: flex; }
+
+  .wait-box {
+    font-family: 'Space Mono', monospace;
+    font-size: 80px;
+    font-weight: 700;
+    color: var(--accent);
+    animation: pulse-count 0.6s ease-in-out;
+    text-shadow: 0 0 40px rgba(0,229,192,0.5);
+  }
+
+  @keyframes pulse-count {
+    0% { transform: scale(1.4); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ---- PROGRESS ---- */
+  .progress-dots {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 360px;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.2s;
+  }
+
+  .dot.done { background: var(--accent); }
+  .dot.current { background: var(--accent2); }
+
+  /* ---- RESPONSIVE ---- */
+  @media (max-width: 500px) {
+    .grid { width: 300px; height: 300px; }
+    .intro-info { grid-template-columns: 1fr; }
+    .score-grid { grid-template-columns: 1fr 1fr; }
+    .intro-card, .instructions-card, .result-card { padding: 28px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- WAIT OVERLAY -->
+<div class="wait-overlay" id="waitOverlay">
+  <div class="wait-box" id="waitCount"></div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <div class="logo-text">
+      <strong>Dual N-Back</strong>
+      Cognitive Experiment
+    </div>
+  </div>
+  <div class="badge">Research Build</div>
+</header>
+
+<main>
+
+  <!-- INTRO SCREEN -->
+  <div class="screen active" id="screen-intro">
+    <div class="intro-card">
+      <h1>Dual N-Back <span>Experiment</span></h1>
+      <p class="subtitle">Standardized sequence — identical for every participant</p>
+
+      <div class="intro-info">
+        <div class="info-box">
+          <div class="label">N-Back Level</div>
+          <div class="value"><span>2</span>-Back</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Total Trials</div>
+          <div class="value"><span>24</span> trials</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Trial Duration</div>
+          <div class="value"><span>3 s</span> each</div>
+        </div>
+        <div class="info-box">
+          <div class="label">Sequence</div>
+          <div class="value"><span>Fixed</span> (seeded)</div>
+        </div>
+      </div>
+
+      <div class="participant-section">
+        <label for="participantId">Participant ID / Name</label>
+        <input type="text" id="participantId" placeholder="e.g. P001 or Jane Doe" />
+      </div>
+
+      <button class="btn-primary" onclick="goInstructions()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- INSTRUCTIONS SCREEN -->
+  <div class="screen" id="screen-instructions">
+    <div class="instructions-card">
+      <h2>// How to play</h2>
+      <p>Each trial shows a <strong style="color:var(--accent)">square lighting up</strong> on the grid and plays a <strong style="color:var(--accent2)">spoken letter</strong>. Your task is to respond when the current trial matches what happened <strong>2 trials ago</strong>.</p>
+      <p>You must track both streams independently. You can respond to one, both, or neither per trial.</p>
+
+      <div class="key-guide">
+        <div class="key-item">
+          <div class="key-badge pos-key">A</div>
+          <div class="key-desc">Position match<br><small style="color:var(--muted)">Same grid square as 2 back</small></div>
+        </div>
+        <div class="key-item">
+          <div class="key-badge aud-key" style="background:rgba(255,107,53,0.15);color:var(--accent2)">L</div>
+          <div class="key-desc">Audio match<br><small style="color:var(--muted)">Same letter as 2 back</small></div>
+        </div>
+      </div>
+
+      <p style="font-size:13px; color:var(--muted)">The first 2 trials have no correct responses (no reference yet). Respond only when you are confident — false alarms count against your score.</p>
+
+      <div style="margin-top:24px; display:flex; justify-content:center;">
+        <button class="btn-primary" onclick="startCountdown()">Start Experiment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div class="screen" id="screen-game">
+
+    <div class="game-header">
+      <div class="trial-counter">Trial <span id="trialNum">1</span> / 24</div>
+      <div class="nback-indicator"><span>2</span>-Back</div>
+      <div class="score-live">Score<span id="livScore">0</span></div>
+    </div>
+
+    <div class="progress-dots" id="progressDots"></div>
+
+    <div class="grid-wrap">
+      <div class="grid" id="grid">
+        <div class="cell" id="c0"></div>
+        <div class="cell" id="c1"></div>
+        <div class="cell" id="c2"></div>
+        <div class="cell" id="c3"></div>
+        <div class="cell" id="c4"></div>
+        <div class="cell" id="c5"></div>
+        <div class="cell" id="c6"></div>
+        <div class="cell" id="c7"></div>
+        <div class="cell" id="c8"></div>
+      </div>
+    </div>
+
+    <div class="audio-display">
+      <div class="audio-label">Spoken Letter</div>
+      <div class="audio-letter" id="audioLetter">—</div>
+    </div>
+
+    <div class="feedback-bar">
+      <div class="feedback-fill" id="feedbackFill"></div>
+    </div>
+
+    <div class="response-buttons">
+      <button class="btn-response pos-btn" id="btnPos" onclick="respond('position')">
+        <span class="btn-key">A</span>
+        Position Match
+      </button>
+      <button class="btn-response aud-btn" id="btnAud" onclick="respond('audio')">
+        <span class="btn-key">L</span>
+        Audio Match
+      </button>
+    </div>
+
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div class="screen" id="screen-result">
+    <div class="result-card">
+      <h2>Session Complete</h2>
+      <div class="participant-name" id="resultName"></div>
+
+      <div class="score-grid">
+        <div class="score-box">
+          <div class="s-label">Overall Score</div>
+          <div class="s-value" id="rScore">—</div>
+          <div class="s-sub">out of 44</div>
+        </div>
+        <div class="score-box">
+          <div class="s-label">Accuracy</div>
+          <div class="s-value" id="rAcc">—</div>
+          <div class="s-sub">hit rate %</div>
+        </div>
+        <div class="score-box">
+          <div class="s-label">Reaction Time</div>
+          <div class="s-value" id="rRT">—</div>
+          <div class="s-sub">avg ms</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;text-align:left;">
+        <div>
+          <div style="font-family:'Space Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px;">// Position</div>
+          <table class="data-table">
+            <tr><th>Metric</th><th>Count</th></tr>
+            <tr><td>Hits</td><td id="pHits" style="color:var(--correct)">—</td></tr>
+            <tr><td>Misses</td><td id="pMiss" style="color:var(--wrong)">—</td></tr>
+            <tr><td>False Alarms</td><td id="pFA" style="color:var(--accent2)">—</td></tr>
+            <tr><td>Correct Rejects</td><td id="pCR" style="color:var(--muted)">—</td></tr>
+          </table>
+        </div>
+        <div>
+          <div style="font-family:'Space Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px;">// Audio</div>
+          <table class="data-table">
+            <tr><th>Metric</th><th>Count</th></tr>
+            <tr><td>Hits</td><td id="aHits" style="color:var(--correct)">—</td></tr>
+            <tr><td>Misses</td><td id="aMiss" style="color:var(--wrong)">—</td></tr>
+            <tr><td>False Alarms</td><td id="aFA" style="color:var(--accent2)">—</td></tr>
+            <tr><td>Correct Rejects</td><td id="aCR" style="color:var(--muted)">—</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;margin-bottom:24px;">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px;text-align:left;">// Trial-by-Trial Log</div>
+        <table class="data-table" id="trialLog">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Pos</th>
+              <th>Letter</th>
+              <th>Pos Match</th>
+              <th>Aud Match</th>
+              <th>Pos Response</th>
+              <th>Aud Response</th>
+              <th>Pos Result</th>
+              <th>Aud Result</th>
+              <th>RT (ms)</th>
+            </tr>
+          </thead>
+          <tbody id="trialLogBody"></tbody>
+        </table>
+      </div>
+
+      <div class="export-section">
+        <button class="btn-export" onclick="exportCSV()">Export CSV</button>
+        <button class="btn-again" onclick="resetGame()">New Participant</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────
+// FIXED DETERMINISTIC SEQUENCE (seeded RNG)
+// Same for every participant — do not change
+// ─────────────────────────────────────────────
+function seededRNG(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+const SEED = 20240101;
+const N_BACK = 2;
+const TOTAL_TRIALS = 24;
+const TRIAL_MS = 3000;
+const STIM_MS = 500;
+const LETTERS = ['B','C','D','G','H','K','P','Q','T','V'];
+const POSITIONS = [0,1,2,3,4,5,6,7,8];
+
+function generateSequence() {
+  const rng = seededRNG(SEED);
+  const positions = [];
+  const letters = [];
+
+  // Generate base sequence
+  for (let i = 0; i < TOTAL_TRIALS; i++) {
+    positions.push(Math.floor(rng() * 9));
+    letters.push(LETTERS[Math.floor(rng() * LETTERS.length)]);
+  }
+
+  // Now inject controlled matches (ensures ~8 position + ~8 audio matches)
+  // Position matches at fixed trial indices
+  const posMatchTrials = [4,6,9,11,14,17,20,22];
+  posMatchTrials.forEach(i => { positions[i] = positions[i - N_BACK]; });
+
+  // Audio matches at different fixed trial indices
+  const audMatchTrials = [5,7,10,13,15,18,21,23];
+  audMatchTrials.forEach(i => { letters[i] = letters[i - N_BACK]; });
+
+  return { positions, letters, posMatchTrials: new Set(posMatchTrials), audMatchTrials: new Set(audMatchTrials) };
+}
+
+const SEQ = generateSequence();
+
+// ─────────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────────
+let currentTrial = 0;
+let trialTimer = null;
+let trialStartTime = null;
+let posResponded = false;
+let audResponded = false;
+let trialData = [];
+let score = 0;
+let synth = window.speechSynthesis;
+let participant = '';
+let timerInterval = null;
+
+// Tracks per-trial responses
+let curPosResp = false;
+let curAudResp = false;
+
+// ─────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+function goInstructions() {
+  participant = document.getElementById('participantId').value.trim() || 'Anonymous';
+  showScreen('instructions');
+}
+
+function startCountdown() {
+  showScreen('game');
+  buildProgressDots();
+  let count = 3;
+  const overlay = document.getElementById('waitOverlay');
+  const countEl = document.getElementById('waitCount');
+  overlay.classList.add('active');
+  countEl.textContent = count;
+
+  const cd = setInterval(() => {
+    count--;
+    if (count === 0) {
+      clearInterval(cd);
+      countEl.textContent = 'GO';
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        runTrial();
+      }, 600);
+    } else {
+      countEl.textContent = count;
+      countEl.style.animation = 'none';
+      countEl.offsetHeight;
+      countEl.style.animation = 'pulse-count 0.6s ease-in-out';
+    }
+  }, 700);
+}
+
+function buildProgressDots() {
+  const container = document.getElementById('progressDots');
+  container.innerHTML = '';
+  for (let i = 0; i < TOTAL_TRIALS; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.id = 'dot-' + i;
+    container.appendChild(d);
+  }
+}
+
+// ─────────────────────────────────────────────
+// TRIAL LOGIC
+// ─────────────────────────────────────────────
+function runTrial() {
+  if (currentTrial >= TOTAL_TRIALS) { endGame(); return; }
+
+  curPosResp = false;
+  curAudResp = false;
+  trialStartTime = Date.now();
+
+  const pos = SEQ.positions[currentTrial];
+  const letter = SEQ.letters[currentTrial];
+
+  // Update header
+  document.getElementById('trialNum').textContent = currentTrial + 1;
+
+  // Update dot
+  if (currentTrial > 0) {
+    document.getElementById('dot-' + (currentTrial - 1)).classList.remove('current');
+    document.getElementById('dot-' + (currentTrial - 1)).classList.add('done');
+  }
+  document.getElementById('dot-' + currentTrial).classList.add('current');
+
+  // Enable buttons (only if N >= N_BACK)
+  const canRespond = currentTrial >= N_BACK;
+  document.getElementById('btnPos').style.opacity = canRespond ? '1' : '0.3';
+  document.getElementById('btnAud').style.opacity = canRespond ? '1' : '0.3';
+  document.getElementById('btnPos').style.pointerEvents = canRespond ? 'auto' : 'none';
+  document.getElementById('btnAud').style.pointerEvents = canRespond ? 'auto' : 'none';
+
+  // Show grid cell
+  const cell = document.getElementById('c' + pos);
+  cell.classList.add('active');
+
+  // Show letter
+  const letterEl = document.getElementById('audioLetter');
+  letterEl.textContent = letter;
+  letterEl.classList.add('show');
+
+  // Speak letter
+  if (synth) {
+    synth.cancel();
+    const utt = new SpeechSynthesisUtterance(letter);
+    utt.rate = 1.2;
+    utt.volume = 0.9;
+    synth.speak(utt);
+  }
+
+  // Start timer bar
+  startTimerBar(TRIAL_MS);
+
+  // Hide stimulus after STIM_MS
+  setTimeout(() => {
+    cell.classList.remove('active');
+    letterEl.classList.remove('show');
+  }, STIM_MS);
+
+  // End trial after TRIAL_MS
+  trialTimer = setTimeout(() => {
+    endTrial();
+  }, TRIAL_MS);
+}
+
+function startTimerBar(duration) {
+  const fill = document.getElementById('feedbackFill');
+  fill.style.transition = 'none';
+  fill.style.transform = 'scaleX(1)';
+  fill.offsetHeight; // reflow
+  fill.style.transition = `transform ${duration}ms linear`;
+  fill.style.transform = 'scaleX(0)';
+}
+
+function respond(type) {
+  if (currentTrial < N_BACK) return;
+  const rt = Date.now() - trialStartTime;
+
+  if (type === 'position' && !curPosResp) {
+    curPosResp = true;
+    flashButton('btnPos', SEQ.posMatchTrials.has(currentTrial));
+  } else if (type === 'audio' && !curAudResp) {
+    curAudResp = true;
+    flashButton('btnAud', SEQ.audMatchTrials.has(currentTrial));
+  }
+}
+
+function flashButton(id, correct) {
+  const btn = document.getElementById(id);
+  btn.classList.remove('pressed-correct', 'pressed-wrong');
+  btn.classList.add(correct ? 'pressed-correct' : 'pressed-wrong');
+  setTimeout(() => btn.classList.remove('pressed-correct', 'pressed-wrong'), 400);
+}
+
+function endTrial() {
+  const rt = Date.now() - trialStartTime;
+  const posMatch = SEQ.posMatchTrials.has(currentTrial);
+  const audMatch = SEQ.audMatchTrials.has(currentTrial);
+  const isNBackTrial = currentTrial >= N_BACK;
+
+  let posResult = 'N/A', audResult = 'N/A';
+  let trialScore = 0;
+
+  if (isNBackTrial) {
+    // Position
+    if (posMatch && curPosResp) { posResult = 'hit'; trialScore += 1; score += 1; }
+    else if (posMatch && !curPosResp) { posResult = 'miss'; }
+    else if (!posMatch && curPosResp) { posResult = 'false_alarm'; score -= 1; }
+    else { posResult = 'correct_reject'; trialScore += 1; score += 1; }
+
+    // Audio
+    if (audMatch && curAudResp) { audResult = 'hit'; trialScore += 1; score += 1; }
+    else if (audMatch && !curAudResp) { audResult = 'miss'; }
+    else if (!audMatch && curAudResp) { audResult = 'false_alarm'; score -= 1; }
+    else { audResult = 'correct_reject'; trialScore += 1; score += 1; }
+  }
+
+  trialData.push({
+    trial: currentTrial + 1,
+    pos: SEQ.positions[currentTrial],
+    letter: SEQ.letters[currentTrial],
+    posMatch, audMatch,
+    posResp: curPosResp, audResp: curAudResp,
+    posResult, audResult,
+    rt: isNBackTrial ? rt : null
+  });
+
+  document.getElementById('livScore').textContent = Math.max(0, score);
+  currentTrial++;
+  runTrial();
+}
+
+// ─────────────────────────────────────────────
+// KEYBOARD SUPPORT
+// ─────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('screen-game').classList.contains('active')) {
+    if (e.key === 'a' || e.key === 'A') respond('position');
+    if (e.key === 'l' || e.key === 'L') respond('audio');
+  }
+});
+
+// ─────────────────────────────────────────────
+// END GAME & RESULTS
+// ─────────────────────────────────────────────
+function endGame() {
+  // Update last dot
+  if (currentTrial > 0) {
+    const lastDot = document.getElementById('dot-' + (currentTrial - 1));
+    if (lastDot) { lastDot.classList.remove('current'); lastDot.classList.add('done'); }
+  }
+
+  const eligible = trialData.filter(t => t.posResult !== 'N/A');
+
+  // Position stats
+  const pHits = eligible.filter(t => t.posResult === 'hit').length;
+  const pMiss = eligible.filter(t => t.posResult === 'miss').length;
+  const pFA   = eligible.filter(t => t.posResult === 'false_alarm').length;
+  const pCR   = eligible.filter(t => t.posResult === 'correct_reject').length;
+
+  // Audio stats
+  const aHits = eligible.filter(t => t.audResult === 'hit').length;
+  const aMiss = eligible.filter(t => t.audResult === 'miss').length;
+  const aFA   = eligible.filter(t => t.audResult === 'false_alarm').length;
+  const aCR   = eligible.filter(t => t.audResult === 'correct_reject').length;
+
+  const totalHits = pHits + aHits;
+  const totalTarget = eligible.filter(t => t.posMatch).length + eligible.filter(t => t.audMatch).length;
+  const hitRate = totalTarget > 0 ? Math.round((totalHits / totalTarget) * 100) : 0;
+
+  const rts = eligible.filter(t => t.rt !== null).map(t => t.rt);
+  const avgRT = rts.length > 0 ? Math.round(rts.reduce((a,b) => a+b, 0) / rts.length) : 0;
+
+  document.getElementById('rScore').textContent = Math.max(0, score);
+  document.getElementById('rAcc').textContent = hitRate + '%';
+  document.getElementById('rRT').textContent = avgRT;
+  document.getElementById('resultName').textContent = '// ' + participant;
+
+  document.getElementById('pHits').textContent = pHits;
+  document.getElementById('pMiss').textContent = pMiss;
+  document.getElementById('pFA').textContent = pFA;
+  document.getElementById('pCR').textContent = pCR;
+  document.getElementById('aHits').textContent = aHits;
+  document.getElementById('aMiss').textContent = aMiss;
+  document.getElementById('aFA').textContent = aFA;
+  document.getElementById('aCR').textContent = aCR;
+
+  // Build trial log
+  const tbody = document.getElementById('trialLogBody');
+  tbody.innerHTML = '';
+  trialData.forEach(t => {
+    const tr = document.createElement('tr');
+    const tagMap = {
+      hit: '<span class="tag hit">HIT</span>',
+      miss: '<span class="tag miss">MISS</span>',
+      false_alarm: '<span class="tag fa">FA</span>',
+      correct_reject: '<span class="tag cr">CR</span>',
+      'N/A': '<span class="tag na">—</span>'
+    };
+    tr.innerHTML = `
+      <td>${t.trial}</td>
+      <td>${t.pos}</td>
+      <td>${t.letter}</td>
+      <td>${t.posMatch ? '✓' : '—'}</td>
+      <td>${t.audMatch ? '✓' : '—'}</td>
+      <td>${t.posResp ? '✓' : '—'}</td>
+      <td>${t.audResp ? '✓' : '—'}</td>
+      <td>${tagMap[t.posResult] || t.posResult}</td>
+      <td>${tagMap[t.audResult] || t.audResult}</td>
+      <td>${t.rt !== null ? t.rt : '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  showScreen('result');
+}
+
+// ─────────────────────────────────────────────
+// EXPORT CSV
+// ─────────────────────────────────────────────
+function exportCSV() {
+  const headers = ['Trial','Position','Letter','PosMatch','AudMatch','PosResponse','AudResponse','PosResult','AudResult','RT_ms','Participant','Timestamp'];
+  const ts = new Date().toISOString();
+  const rows = trialData.map(t => [
+    t.trial, t.pos, t.letter,
+    t.posMatch ? 1 : 0, t.audMatch ? 1 : 0,
+    t.posResp ? 1 : 0, t.audResp ? 1 : 0,
+    t.posResult, t.audResult,
+    t.rt !== null ? t.rt : '',
+    participant, ts
+  ].join(','));
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `nback_${participant.replace(/\s+/g,'_')}_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────
+// RESET
+// ─────────────────────────────────────────────
+function resetGame() {
+  currentTrial = 0;
+  trialData = [];
+  score = 0;
+  curPosResp = false;
+  curAudResp = false;
+  if (trialTimer) clearTimeout(trialTimer);
+  document.getElementById('participantId').value = '';
+  showScreen('intro');
+}
+</script>
+</body>
+</html>
